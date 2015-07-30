@@ -747,6 +747,8 @@ void qmp_migrate(const char *uri, bool has_blk, bool blk,
     } else if (strstart(uri, "fd:", &p)) {
         fd_start_outgoing_migration(s, p, &local_err);
 #endif
+    } else if (strstart(uri, "test:", &p)) {
+        test_start_migration(s, p, &local_err);
     } else {
         error_setg(errp, QERR_INVALID_PARAMETER_VALUE, "uri",
                    "a valid migration protocol");
@@ -1037,5 +1039,52 @@ void migrate_fd_connect(MigrationState *s)
 
     migrate_compress_threads_create();
     qemu_thread_create(&s->thread, "migration", migration_thread, s,
+                       QEMU_THREAD_JOINABLE);
+}
+
+static void *test_migration_thread(void *opaque)
+{
+    trace_probe_timestamp();
+    trace_probe_timestamp();
+    MigrationState *s = opaque;
+    int64_t initial_bytes = 0;
+
+    int64_t start_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    trace_probe_timestamp();
+
+    initial_bytes = qemu_probevm_state_begin(s->file, &s->params);
+    trace_probe_begin(initial_bytes);
+    trace_probe_timestamp();
+    migrate_set_state(s, MIGRATION_STATUS_SETUP, MIGRATION_STATUS_ACTIVE);
+    uint64_t pending_size;
+    int i;
+    for(i=0;i<10;i++){
+        trace_probe_timestamp();
+        g_usleep( max_downtime / 1000);
+        trace_probe_timestamp();
+        pending_size = qemu_probevm_state_pending(s->file);
+        trace_probe_pending(pending_size);
+    }
+    qemu_probevm_state_complete(s->file);
+    trace_probe_timestamp();
+    migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
+                         MIGRATION_STATUS_COMPLETED);
+    int64_t end_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    s->total_time = end_time - s->total_time;
+    s->downtime = end_time - start_time;
+    
+    return NULL;
+}
+
+void migrate_test_connect(MigrationState *s)
+{
+    /* This is a best 1st approximation. ns to ms */
+    s->expected_downtime = max_downtime/1000000;
+    s->cleanup_bh = qemu_bh_new(migrate_fd_cleanup, s);
+
+    /* Notify before starting migration thread */
+    notifier_list_notify(&migration_state_notifiers, s);
+
+    qemu_thread_create(&s->thread, "test_migration", test_migration_thread, s,
                        QEMU_THREAD_JOINABLE);
 }
