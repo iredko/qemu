@@ -1410,6 +1410,9 @@ flic_no_device_api(int err) "flic: no Device Contral API support %d"
 flic_reset_failed(int err) "flic: reset failed %d"
 
 # migration.c
+probe_timestamp(void) ""
+probe_begin(int64_t initital_bytes) "usedmem %" PRId64" bytes"
+probe_pending(uint64_t pending_size) "dirtied mem %" PRIu64
 migrate_set_state(int new_state) "new state %d"
 migrate_fd_cleanup(void) ""
 migrate_fd_error(void) ""
