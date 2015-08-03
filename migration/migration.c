@@ -1064,14 +1064,15 @@ int64_t estimate_mig_time(uint64_t init_bytes, uint64_t dirtied_bytes,
                            
 static void *test_migration_thread(void *opaque)
 {
-    trace_probe_timestamp();
-    trace_probe_timestamp();
     MigrationState *s = opaque;
     int64_t initial_bytes = 0;
     uint64_t pending_size;
     int64_t start_time;
     int64_t delta_time;
+    int64_t end_time;
     trace_probe_timestamp();
+
+    rcu_register_thread();
 
     initial_bytes = qemu_probevm_state_begin(s->file, &s->params);
     trace_probe_begin(initial_bytes);
@@ -1080,7 +1081,7 @@ static void *test_migration_thread(void *opaque)
 
     start_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
     int i;
-    for(i=0;i<10;i++){
+    for ( i = 0; i < 10; i++ ){
         trace_probe_timestamp();
         g_usleep( max_downtime / 1000);
         trace_probe_timestamp();
@@ -1093,10 +1094,14 @@ static void *test_migration_thread(void *opaque)
     trace_probe_timestamp();
     migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
                          MIGRATION_STATUS_COMPLETED);
-    int64_t end_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    end_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    qemu_mutex_lock_iothread();
     s->total_time = end_time - s->total_time;
     s->downtime = end_time - start_time;
-    
+    qemu_bh_schedule(s->cleanup_bh);
+    qemu_mutex_unlock_iothread();
+
+    rcu_unregister_thread();
     return NULL;
 }
 
