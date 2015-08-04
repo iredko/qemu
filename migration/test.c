@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "trace.h"
+#include "qmp-commands.h"
 
 typedef struct QEMUFileTest {
     MigrationState *s;
@@ -17,6 +18,10 @@ typedef struct QEMUFileTest {
 } QEMUFileTest;
 
 //stubs
+static uint64_t downtime;
+static uint64_t initial_size;
+static uint64_t dirtied_size;
+
 static int qemu_test_get_buffer(void *opaque, uint8_t *buf,
                                 int64_t pos, int size)
 {
@@ -91,11 +96,12 @@ static void *qemu_fopen_test(MigrationState *s, const char *mode)
 void test_start_migration(void *opaque, const char *host_port, Error **errp)
 {
     MigrationState *s = opaque;
-    
+    downtime = migrate_max_downtime;
+    qmp_migrate_set_downtime(0, NULL);
     s->file = qemu_fopen_test(s, "wb");
     
 //TODO change to migrate_fd_connect eventualy, to see what happen
-    migrate_test_connect(s);
+    migrate_fd_connect(s);
     return;
 }
 

@@ -261,6 +261,8 @@ void qemu_start_incoming_migration(const char *uri, Error **errp)
     } else if (strstart(uri, "fd:", &p)) {
         fd_start_incoming_migration(p, errp);
 #endif
+    } else if (strstart(uri, "test:", &p)) {
+        test_start_migration(p, errp);
     } else {
         error_setg(errp, "unknown migration protocol: %s", uri);
     }
