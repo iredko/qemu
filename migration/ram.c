@@ -548,41 +548,11 @@ static void migration_bitmap_sync_init(void)
     iterations_prev = 0;
 }
 
-/* Called with iothread lock held, to protect ram_list.dirty_memory[] */
-static void migration_bitmap_sync(void)
+static void migration_auto_converge_check(void)
 {
-    RAMBlock *block;
-    uint64_t num_dirty_pages_init = migration_dirty_pages;
-    MigrationState *s = migrate_get_current();
-    int64_t end_time;
     int64_t bytes_xfer_now;
-
-    bitmap_sync_count++;
-
-    if (!bytes_xfer_prev) {
-        bytes_xfer_prev = ram_bytes_transferred();
-    }
-
-    if (!start_time) {
-        start_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
-    }
-
-    trace_migration_bitmap_sync_start();
-    address_space_sync_dirty_bitmap(&address_space_memory);
-
-    qemu_mutex_lock(&migration_bitmap_mutex);
-    rcu_read_lock();
-    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
-        migration_bitmap_sync_range(block->mr->ram_addr, block->used_length);
-    }
-    rcu_read_unlock();
-    qemu_mutex_unlock(&migration_bitmap_mutex);
-
-    trace_migration_bitmap_sync_end(migration_dirty_pages
-                                    - num_dirty_pages_init);
-    num_dirty_pages_period += migration_dirty_pages - num_dirty_pages_init;
-    end_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
-
+    MigrationState *s = migrate_get_current();
+    int64_t end_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
     /* more than 1 second = 1000 millisecons */
     if (end_time > start_time + 1000) {
         if (migrate_auto_converge()) {
@@ -620,6 +590,41 @@ static void migration_bitmap_sync(void)
         start_time = end_time;
         num_dirty_pages_period = 0;
     }
+}
+/* Called with iothread lock held, to protect ram_list.dirty_memory[] */
+static void migration_bitmap_sync(void)
+{
+    RAMBlock *block;
+    uint64_t num_dirty_pages_init = migration_dirty_pages;
+    MigrationState *s = migrate_get_current();
+
+    bitmap_sync_count++;
+
+    if (!bytes_xfer_prev) {
+        bytes_xfer_prev = ram_bytes_transferred();
+    }
+
+    if (!start_time) {
+        start_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    }
+
+    trace_migration_bitmap_sync_start();
+    address_space_sync_dirty_bitmap(&address_space_memory);
+
+    qemu_mutex_lock(&migration_bitmap_mutex);
+    rcu_read_lock();
+    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
+        migration_bitmap_sync_range(block->mr->ram_addr, block->used_length);
+    }
+    rcu_read_unlock();
+    qemu_mutex_unlock(&migration_bitmap_mutex);
+
+    trace_migration_bitmap_sync_end(migration_dirty_pages
+                                    - num_dirty_pages_init);
+    num_dirty_pages_period += migration_dirty_pages - num_dirty_pages_init;
+
+    migration_auto_converge_check();
+
     s->dirty_sync_count = bitmap_sync_count;
 }
 
