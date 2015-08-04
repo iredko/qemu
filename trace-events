@@ -1487,6 +1487,11 @@ rdma_start_incoming_migration_after_rdma_listen(void) ""
 rdma_start_outgoing_migration_after_rdma_connect(void) ""
 rdma_start_outgoing_migration_after_rdma_source_init(void) ""
 
+# migration/test.c
+qemu_test_put_buffer(int size) "put %i bytes"
+qemu_test_save_page(size_t size) "save %zu bytes"
+test_result(uint64_t init_bytes, uint64_t d_bytes, double d_b_rate, int64_t etimated_time) "init size %" PRIu64 "dirtied bytes %" PRIu64 " dirtybytesrate %g estimated time%" PRId64
+
 # kvm-all.c
 kvm_ioctl(int type, void *arg) "type 0x%x, arg %p"
 kvm_vm_ioctl(int type, void *arg) "type 0x%x, arg %p"

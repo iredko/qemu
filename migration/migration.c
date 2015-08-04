@@ -754,7 +754,7 @@ void qmp_migrate(const char *uri, bool has_blk, bool blk,
     } else if (strstart(uri, "fd:", &p)) {
         fd_start_outgoing_migration(s, p, &local_err);
 #endif
-    } else if (strstart(uri, "fd:", &p)) {
+    } else if (strstart(uri, "test:", &p)) {
         test_start_migration(s, p, &local_err);
     } else {
         error_setg(errp, QERR_INVALID_PARAMETER_VALUE, "uri",
