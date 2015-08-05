@@ -72,7 +72,11 @@ static int64_t test_result(void)
     trace_test_result ( initial_bytes, dirtied_bytes, dirty_bytes_rate, estimated_time_ms );
     return estimated_time_ms;
 }
-
+static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
+                                        uint64_t flags, void *data)
+{
+    return 0;
+}
 
 static int qemu_test_after_iterate(QEMUFile *f, void *opaque,
                                         uint64_t flags, void *data)
@@ -112,13 +116,13 @@ static int qemu_test_after_iterate(QEMUFile *f, void *opaque,
 //WE SHOULD NEVER GET HERE!
     case RAM_CONTROL_FINISH:
         trace_probe_timestamp();
-        migrate_set_state_wrap(s, MIGRATION_STATUS_ACTIVE,
-                                      MIGRATION_STATUS_FAILED);
+        //migrate_set_state_wrap(s, MIGRATION_STATUS_ACTIVE,
+//                                      MIGRATION_STATUS_FAILED);
     }
 
     return 0;
 }
-/*
+
 static size_t qemu_test_save_page(QEMUFile *f, void *opaque,
                                   ram_addr_t block_offset, ram_addr_t offset,
                                   size_t size, uint64_t *bytes_sent)
@@ -128,7 +132,7 @@ static size_t qemu_test_save_page(QEMUFile *f, void *opaque,
     *bytes_sent = size;
     return size;
 }
-*/
+
 //do not use for incoming
 static const QEMUFileOps test_read_ops = {
     .get_buffer         = qemu_test_get_buffer,
@@ -136,11 +140,12 @@ static const QEMUFileOps test_read_ops = {
 };
 
 static const QEMUFileOps test_write_ops = {
+    .hook_ram_sync      = qemu_test_sync_hook,
     .put_buffer         = qemu_test_put_buffer,
     .close              = qemu_test_close,
     .before_ram_iterate = qemu_test_before_iterate,
     .after_ram_iterate  = qemu_test_after_iterate,
-//    .save_page          = qemu_test_save_page,
+    .save_page          = qemu_test_save_page,
 };
 
 static void *qemu_fopen_test(MigrationState *s, const char *mode)
@@ -158,9 +163,9 @@ static void *qemu_fopen_test(MigrationState *s, const char *mode)
     if (mode[0] == 'w') {
         t->file = qemu_fopen_ops(s, &test_write_ops);
     } else {
-        t->file = qemu_fopen_ops(s, &test_read_ops);
+        return NULL;
     }
-
+    qemu_file_set_rate_limit(t->file, -1);
     return t->file;
 }
 
@@ -170,6 +175,7 @@ void test_start_migration(void *opaque, const char *host_port, Error **errp)
 {
     MigrationState *s = opaque;
     s->file = qemu_fopen_test(s, "wb");
+    s->enabled_capabilities[MIGRATION_CAPABILITY_COMPRESS] = false;
     migrate_fd_connect(s);
     return;
 }

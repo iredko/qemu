@@ -168,6 +168,18 @@ void ram_control_load_hook(QEMUFile *f, uint64_t flags, void *data)
     }
 }
 
+void ram_control_sync_hook(QEMUFile *f, uint64_t flags)
+{
+    int ret = 0;
+
+    if (f->ops->hook_ram_sync) {
+        ret = f->ops->hook_ram_sync(f, f->opaque, flags, NULL);
+        if (ret < 0) {
+            qemu_file_set_error(f, ret);
+        }
+    }
+}
+
 size_t ram_control_save_page(QEMUFile *f, ram_addr_t block_offset,
                              ram_addr_t offset, size_t size,
                              uint64_t *bytes_sent)
@@ -576,6 +588,7 @@ ssize_t qemu_put_compression_data(QEMUFile *f, const uint8_t *p, size_t size,
     }
     qemu_put_be32(f, blen);
     f->buf_index += blen;
+    trace_qemu_file_compress_info(level, size, blen);
     return blen + sizeof(int32_t);
 }
 

@@ -1220,6 +1220,7 @@ vmstate_subsection_load_good(const char *parent) "%s"
 
 # qemu-file.c
 qemu_file_fclose(void) ""
+qemu_file_compress_info(int level, size_t size, ssize_t blen) "Compression level %i, raw size %zu, compressed size %zd"
 
 # migration/ram.c
 migration_bitmap_sync_start(void) ""

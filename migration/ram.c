@@ -577,7 +577,7 @@ static void migration_bitmap_sync(void)
     }
     rcu_read_unlock();
     qemu_mutex_unlock(&migration_bitmap_mutex);
-
+    trace_migration_bitmap_sync_end(migration_dirty_pages);
     trace_migration_bitmap_sync_end(migration_dirty_pages
                                     - num_dirty_pages_init);
     num_dirty_pages_period += migration_dirty_pages - num_dirty_pages_init;
@@ -1281,7 +1281,8 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
 
     remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
 
-    if (remaining_size < max_size) {
+    if (remaining_size <= max_size) {
+        ram_control_sync_hook(f, RAM_CONTROL_HOOK);
         qemu_mutex_lock_iothread();
         rcu_read_lock();
         migration_bitmap_sync();
