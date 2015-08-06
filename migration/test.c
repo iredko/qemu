@@ -64,7 +64,6 @@ static int64_t test_result(int64_t time_delta)
     double dirty_bytes_rate = dirtied_bytes/time_delta;
     uint64_t remaining = initial_bytes;
     uint64_t max_size = dirty_bytes_rate * (downtime / 1000000);
-    trace_test_result ( initial_bytes, dirtied_bytes, dirty_bytes_rate, estimated_time_ms );
     if(dirty_bytes_rate < Bpms){
         do{
             dt_ms = remaining / Bpms;
@@ -96,18 +95,19 @@ static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
         test_result(time_delta);
         return -1;
     } else {
-        start_time = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
         zero_iteration_done = true;
         initial_bytes = transfered_bytes;
     }
         return 0;
 }
-/*
+
 static int qemu_test_after_iterate(QEMUFile *f, void *opaque,
                                         uint64_t flags, void *data)
 {
     switch ( flags ){
     case RAM_CONTROL_SETUP:
+        start_time = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
+        break;
     case RAM_CONTROL_ROUND:
         break;
 //WE SHOULD NEVER GET HERE!
@@ -116,7 +116,7 @@ static int qemu_test_after_iterate(QEMUFile *f, void *opaque,
     }
     return 0;
 }
-*/
+
 static size_t qemu_test_save_page(QEMUFile *f, void *opaque,
                                   ram_addr_t block_offset, ram_addr_t offset,
                                   size_t size, uint64_t *bytes_sent)
@@ -139,6 +139,7 @@ static const QEMUFileOps test_write_ops = {
     .put_buffer         = qemu_test_put_buffer,
     .close              = qemu_test_close,
     .save_page          = qemu_test_save_page,
+    .after_ram_iterate  = qemu_test_after_iterate,
 };
 
 static void *qemu_fopen_test(MigrationState *s, const char *mode)
