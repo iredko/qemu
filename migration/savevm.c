@@ -994,56 +994,6 @@ uint64_t qemu_probevm_state_begin(QEMUFile *f,
     return ret;
 }
 
-void qemu_probevm_state_complete(QEMUFile *f)
-{
-    SaveStateEntry *se;
-    int ret;
-
-    trace_savevm_state_complete();
-
-    QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-        if (!se->ops || !se->ops->probe_live_complete) {
-            continue;
-        }
-        if (se->ops && se->ops->is_active) {
-            if (!se->ops->is_active(se->opaque)) {
-                continue;
-            }
-        }
-//        trace_savevm_section_start(se->idstr, se->section_id);
-
-//        save_section_header(f, se, QEMU_VM_SECTION_END);
-
-        ret = se->ops->probe_live_complete(f, se->opaque);
-//        trace_savevm_section_end(se->idstr, se->section_id, ret);
-//        save_section_footer(f, se);
-        if (ret < 0) {
-            qemu_file_set_error(f, ret);
-            return;
-        }
-    }
- 
-}
-
-uint64_t qemu_probevm_state_pending(QEMUFile *f)
-{
-    SaveStateEntry *se;
-    uint64_t ret = 0;
-
-    QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-        if (!se->ops || !se->ops->probe_live_pending) {
-            continue;
-        }
-        if (se->ops && se->ops->is_active) {
-            if (!se->ops->is_active(se->opaque)) {
-                continue;
-            }
-        }
-        ret += se->ops->probe_live_pending(f, se->opaque);
-    }
-    return ret;
-}
-
 static int qemu_save_device_state(QEMUFile *f)
 {
     SaveStateEntry *se;

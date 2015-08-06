@@ -1050,15 +1050,18 @@ int64_t estimate_mig_time(uint64_t init_bytes, uint64_t dirtied_bytes,
     double dirty_page_rate = dirtied_bytes/time_delta;
     uint64_t remaining = init_bytes;
     uint64_t max_size = dirty_page_rate * (migrate_max_downtime() / 1000000);
-    do{
+    if(Bpms > dirty_page_rate){
+        do{
+            dt_ms = remaining / Bpms;
+            remaining = dt_ms * dirty_page_rate;
+            estimated_time_ms += dt_ms;
+        } while (remaining > max_size);
         dt_ms = remaining / Bpms;
-        remaining = dt_ms * dirty_page_rate;
         estimated_time_ms += dt_ms;
-        trace_probe_estimate(estimated_time_ms);
-    }while (remaining > max_size);
-    dt_ms = remaining / (mbps * 8) * 1000;
-    estimated_time_ms += dt_ms;
-    
+    } else {
+        estimated_time_ms = -1;
+    } 
+    trace_probe_estimate(estimated_time_ms);
     return estimated_time_ms;
 }
                            
@@ -1085,12 +1088,13 @@ static void *test_migration_thread(void *opaque)
         trace_probe_timestamp();
         g_usleep( max_downtime / 1000);
         trace_probe_timestamp();
-        pending_size = qemu_probevm_state_pending(s->file);
+        //we should turn off disk migration here, for now, maybe some day...
+        pending_size = qemu_savevm_state_pending(s->file, UINT64_MAX);
         delta_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) - start_time;
         trace_probe_pending(pending_size);
         estimate_mig_time(initial_bytes, pending_size, delta_time, 1000.0);
     }
-    qemu_probevm_state_complete(s->file);
+    qemu_savevm_state_cancel();
     trace_probe_timestamp();
     migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
                          MIGRATION_STATUS_COMPLETED);

@@ -92,8 +92,6 @@ void qemu_savevm_state_cancel(void);
 uint64_t qemu_savevm_state_pending(QEMUFile *f, uint64_t max_size);
 uint64_t qemu_probevm_state_begin(QEMUFile *f,
                              const MigrationParams *params);
-void qemu_probevm_state_complete(QEMUFile *f);
-uint64_t qemu_probevm_state_pending(QEMUFile *f);
 int qemu_loadvm_state(QEMUFile *f);
 
 typedef enum DisplayType

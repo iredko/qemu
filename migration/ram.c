@@ -1147,32 +1147,6 @@ static uint64_t ram_probe_setup(QEMUFile *f, void *opaque)
     return dirtied_size;
 }
 
-
-
-/* Called with iothread lock */
-static int ram_probe_complete(QEMUFile *f, void *opaque)
-{
-
-    migration_end();
-    qemu_put_be64(f, RAM_SAVE_FLAG_EOS); //FIXME COPY-PASTE
-
-    return 0;
-}
-
-static uint64_t ram_probe_pending(QEMUFile *f, void *opaque)
-{
-    uint64_t dirtied_size;
-
-    qemu_mutex_lock_iothread();
-    rcu_read_lock();
-    migration_bitmap_sync();
-    rcu_read_unlock();
-    qemu_mutex_unlock_iothread();
-    dirtied_size = migration_dirty_pages * TARGET_PAGE_SIZE;
-    //TODO  zeroing migration_dirty_pages between iterations during probing? (I don't think so)
-    return dirtied_size;
-}
-
 /**********************************************************
 *********************************************************
 *************/
@@ -1693,8 +1667,6 @@ static int ram_load(QEMUFile *f, void *opaque, int version_id)
 
 static SaveVMHandlers savevm_ram_handlers = {
     .probe_live_setup = ram_probe_setup,
-    .probe_live_pending = ram_probe_pending,
-    .probe_live_complete = ram_probe_complete,
     .save_live_setup = ram_save_setup,
     .save_live_iterate = ram_save_iterate,
     .save_live_complete = ram_save_complete,
