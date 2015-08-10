@@ -1039,3 +1039,83 @@ void migrate_fd_connect(MigrationState *s)
     qemu_thread_create(&s->thread, "migration", migration_thread, s,
                        QEMU_THREAD_JOINABLE);
 }
+
+int64_t estimate_mig_time(uint64_t init_bytes, uint64_t dirtied_bytes,
+                           int64_t time_delta, double mbps){
+    int64_t estimated_time_ms = 0;
+    int64_t dt_ms;
+    double Bpms = mbps * (1024 * 128 / 1000);
+    double dirty_page_rate = dirtied_bytes/time_delta;
+    uint64_t remaining = init_bytes;
+    uint64_t max_size = dirty_page_rate * (migrate_max_downtime() / 1000000);
+    if(Bpms > dirty_page_rate){
+        do{
+            dt_ms = remaining / Bpms;
+            remaining = dt_ms * dirty_page_rate;
+            estimated_time_ms += dt_ms;
+        } while (remaining > max_size);
+        dt_ms = remaining / Bpms;
+        estimated_time_ms += dt_ms;
+    } else {
+        estimated_time_ms = -1;
+    } 
+    trace_probe_estimate(estimated_time_ms);
+    return estimated_time_ms;
+}
+                           
+static void *test_migration_thread(void *opaque)
+{
+    MigrationState *s = opaque;
+    int64_t initial_bytes = 0;
+    uint64_t pending_size;
+    int64_t start_time;
+    int64_t delta_time;
+    int64_t end_time;
+    trace_probe_timestamp();
+
+    rcu_register_thread();
+    qemu_savevm_state_begin(s->file, &s->params);
+    initial_bytes = qemu_savevm_state_reset(s->file);
+    trace_probe_begin(initial_bytes);
+    trace_probe_timestamp();
+    migrate_set_state(s, MIGRATION_STATUS_SETUP, MIGRATION_STATUS_ACTIVE);
+
+    start_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    int i;
+    for ( i = 0; i < 10; i++ ){
+        trace_probe_timestamp();
+        g_usleep( max_downtime / 1000);
+        trace_probe_timestamp();
+        //we should turn off disk migration here, for now, maybe some day...
+        pending_size = qemu_savevm_state_pending(s->file, UINT64_MAX);
+        delta_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME) - start_time;
+        trace_probe_pending(pending_size);
+        estimate_mig_time(initial_bytes, pending_size, delta_time, 1000.0);
+    }
+    qemu_savevm_state_cancel();
+    trace_probe_timestamp();
+    migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
+                         MIGRATION_STATUS_COMPLETED);
+    end_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
+    qemu_mutex_lock_iothread();
+    s->total_time = end_time - s->total_time;
+    s->downtime = end_time - start_time;
+    qemu_bh_schedule(s->cleanup_bh);
+    qemu_mutex_unlock_iothread();
+
+    rcu_unregister_thread();
+    return NULL;
+}
+
+void migrate_test_connect(MigrationState *s)
+{
+    /* This is a best 1st approximation. ns to ms */
+    s->expected_downtime = max_downtime/1000000;
+    s->cleanup_bh = qemu_bh_new(migrate_fd_cleanup, s);
+
+    /* Notify before starting migration thread */
+    notifier_list_notify(&migration_state_notifiers, s);
+
+    qemu_thread_create(&s->thread, "test_migration", test_migration_thread, s,
+                       QEMU_THREAD_JOINABLE);
+}

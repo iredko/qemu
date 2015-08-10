@@ -108,11 +108,15 @@ void rdma_start_outgoing_migration(void *opaque, const char *host_port, Error **
 
 void rdma_start_incoming_migration(const char *host_port, Error **errp);
 
+void test_start_migration(void *opaque, const char *host_port, Error **errp);
+
 void migrate_fd_error(MigrationState *s);
 
 void migrate_fd_connect(MigrationState *s);
 
 int migrate_fd_close(MigrationState *s);
+
+void migrate_test_connect(MigrationState *s);
 
 void add_migration_state_change_notifier(Notifier *notify);
 void remove_migration_state_change_notifier(Notifier *notify);
@@ -131,6 +135,9 @@ uint64_t ram_bytes_total(void);
 void free_xbzrle_decoded_buf(void);
 
 void acct_update_position(QEMUFile *f, size_t size, bool zero);
+
+int64_t estimate_mig_time(uint64_t init_bytes, uint64_t dirtied_bytes,
+                          int64_t time_delta, double mbps);
 
 uint64_t dup_mig_bytes_transferred(void);
 uint64_t dup_mig_pages_transferred(void);
