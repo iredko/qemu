@@ -1058,6 +1058,25 @@ static void ram_migration_cancel(void *opaque)
     migration_end();
 }
 
+static uint64_t ram_migration_bitmap_reset(void *opaque)
+{
+    uint64_t dirty_bytes_remaining;
+    int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
+    /* TODO think about more locks?
+     * For now only using for prediction so the only another writer
+     * is migration_bitmap_sync_range()
+     */
+    rcu_read_lock();
+    qemu_mutex_lock(&migration_bitmap_mutex);
+    ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
+    dirty_bytes_remaining = ram_bytes_remaining();
+    bitmap_zero(migration_bitmap, ram_bitmap_pages);
+    migration_dirty_pages = 0;
+    qemu_mutex_unlock(&migration_bitmap_mutex);
+    rcu_read_unlock();
+    return dirty_bytes_remaining;
+}
+
 static void reset_ram_globals(void)
 {
     last_seen_block = NULL;
@@ -1616,6 +1635,7 @@ static SaveVMHandlers savevm_ram_handlers = {
     .save_live_complete = ram_save_complete,
     .save_live_pending = ram_save_pending,
     .load_state = ram_load,
+    .reset_bitmap = ram_migration_bitmap_reset,
     .cancel = ram_migration_cancel,
 };
 

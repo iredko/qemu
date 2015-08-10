@@ -174,7 +174,6 @@ static QEMUFile *qemu_fopen_bdrv(BlockDriverState *bs, int is_writable)
     return qemu_fopen_ops(bs, &bdrv_read_ops);
 }
 
-
 /* QEMUFile timer support.
  * Not in qemu-file.c to not add qemu-timer.c as dependency to qemu-file.c
  */
@@ -948,6 +947,34 @@ static int qemu_savevm_state(QEMUFile *f, Error **errp)
     if (ret != 0) {
         qemu_savevm_state_cancel();
         error_setg_errno(errp, -ret, "Error while writing VM state");
+    }
+    return ret;
+}
+
+uint64_t qemu_savevm_state_reset(QEMUFile *f)
+{
+    SaveStateEntry *se;
+    uint64_t ret=0;
+
+    trace_savevm_state_reset();
+
+    QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
+        if (!se->ops || !se->ops->reset_bitmap) {
+            continue;
+        }
+        if (se->ops && se->ops->is_active) {
+            if (!se->ops->is_active(se->opaque)) {
+                continue;
+            }
+        }
+        //save_section_header(f, se, QEMU_VM_SECTION_START); it will be ommit later, so who care?
+
+        ret += se->ops->reset_bitmap(f);
+        //save_section_footer(f, se); 
+       /* if (ret < 0) {
+            qemu_file_set_error(f, ret);
+            break;
+        }*/
     }
     return ret;
 }

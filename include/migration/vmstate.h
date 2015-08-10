@@ -39,6 +39,7 @@ typedef struct SaveVMHandlers {
     void (*set_params)(const MigrationParams *params, void * opaque);
     SaveStateHandler *save_state;
 
+    uint64_t (*reset_bitmap)(void *opaque);
     void (*cancel)(void *opaque);
     int (*save_live_complete)(QEMUFile *f, void *opaque);
 
