@@ -1076,8 +1076,8 @@ static void *test_migration_thread(void *opaque)
     trace_probe_timestamp();
 
     rcu_register_thread();
-
-    initial_bytes = qemu_probevm_state_begin(s->file, &s->params);
+    qemu_savevm_state_begin(s->file, &s->params);
+    initial_bytes = qemu_savevm_state_reset(s->file);
     trace_probe_begin(initial_bytes);
     trace_probe_timestamp();
     migrate_set_state(s, MIGRATION_STATUS_SETUP, MIGRATION_STATUS_ACTIVE);

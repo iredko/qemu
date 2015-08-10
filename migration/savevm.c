@@ -951,30 +951,15 @@ static int qemu_savevm_state(QEMUFile *f, Error **errp)
     return ret;
 }
 
-uint64_t qemu_probevm_state_begin(QEMUFile *f,
-                             const MigrationParams *params)
+uint64_t qemu_savevm_state_reset(QEMUFile *f)
 {
     SaveStateEntry *se;
     uint64_t ret=0;
 
-    trace_savevm_state_begin();
-    //only for block devices
-    /*QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-        if (!se->ops || !se->ops->set_params) {
-            continue;
-        }
-        se->ops->set_params(params, se->opaque);
-    }*/
-    
-    //No migration accuring
-    
-    /*if (!savevm_state.skip_configuration) {
-        qemu_put_byte(f, QEMU_VM_CONFIGURATION);
-        vmstate_save_state(f, &vmstate_configuration, &savevm_state, 0);
-    }*/
+    trace_savevm_state_reset();
 
     QTAILQ_FOREACH(se, &savevm_state.handlers, entry) {
-        if (!se->ops || !se->ops->probe_live_setup) {
+        if (!se->ops || !se->ops->reset_bitmap) {
             continue;
         }
         if (se->ops && se->ops->is_active) {
@@ -984,7 +969,7 @@ uint64_t qemu_probevm_state_begin(QEMUFile *f,
         }
         //save_section_header(f, se, QEMU_VM_SECTION_START); it will be ommit later, so who care?
 
-        ret += se->ops->probe_live_setup(f, se->opaque);
+        ret += se->ops->reset_bitmap(f);
         //save_section_footer(f, se); 
        /* if (ret < 0) {
             qemu_file_set_error(f, ret);

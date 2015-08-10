@@ -1054,6 +1054,25 @@ static void ram_migration_cancel(void *opaque)
     migration_end();
 }
 
+static uint64_t ram_migration_bitmap_reset(void *opaque)
+{
+    uint64_t dirty_bytes_remaining;
+    int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
+    /* TODO think about more locks?
+     * For now only using for prediction so the only another writer
+     * is migration_bitmap_sync_range()
+     */
+    rcu_read_lock();
+    qemu_mutex_lock(&migration_bitmap_mutex);
+    ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
+    dirty_bytes_remaining = ram_bytes_remaining();
+    bitmap_zero(migration_bitmap, ram_bitmap_pages);
+    migration_dirty_pages = 0;
+    qemu_mutex_unlock(&migration_bitmap_mutex);
+    rcu_read_unlock();
+    return dirty_bytes_remaining;
+}
+
 static void reset_ram_globals(void)
 {
     last_seen_block = NULL;
@@ -1089,67 +1108,7 @@ void migration_bitmap_extend(ram_addr_t old, ram_addr_t new)
         g_free(old_bitmap);
     }
 }
-/*****************************************************************************************************
-FIXME remove copy-paste
-*/
-/* Each of ram_probe_setup, ram_probe_pending and ram_probe_complete has
- * long-running RCU critical section.  When rcu-reclaims in the code
- * start to become numerous it will be necessary to reduce the
- * granularity of these critical sections.
- */
 
-static uint64_t ram_probe_setup(QEMUFile *f, void *opaque)
-{
-    int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
-    uint64_t dirtied_size;
-    mig_throttle_on = false;    
-    dirty_rate_high_cnt = 0;
-    bitmap_sync_count = 0;
-    migration_bitmap_sync_init();
-    qemu_mutex_init(&migration_bitmap_mutex);
-
-
-    /* iothread lock needed for ram_list.dirty_memory[] */
-    qemu_mutex_lock_iothread();
-    qemu_mutex_lock_ramlist();
-    rcu_read_lock();
-    bytes_transferred = 0;
-    reset_ram_globals();
-
-    ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
-    migration_bitmap = bitmap_new(ram_bitmap_pages);
-    bitmap_set(migration_bitmap, 0, ram_bitmap_pages);
-
-    /*
-     * Count the total number of pages used by ram blocks not including any
-     * gaps due to alignment or unplugs.
-     */
-    migration_dirty_pages = ram_bytes_total() >> TARGET_PAGE_BITS;
-
-    memory_global_dirty_log_start();
-    migration_bitmap_sync();
-    qemu_mutex_unlock_ramlist();
-    qemu_mutex_unlock_iothread();
-/*
-    qemu_put_be64(f, ram_bytes_total() | RAM_SAVE_FLAG_MEM_SIZE);
-
-    QLIST_FOREACH_RCU(block, &ram_list.blocks, next) {
-        qemu_put_byte(f, strlen(block->idstr));
-        qemu_put_buffer(f, (uint8_t *)block->idstr, strlen(block->idstr));
-        qemu_put_be64(f, block->used_length);
-    }
-*/
-    rcu_read_unlock();
-    dirtied_size = migration_dirty_pages * TARGET_PAGE_SIZE;
-    //TODO zeroing dirty_bitmap? Done
-    bitmap_zero(migration_bitmap, ram_bitmap_pages);
-    migration_dirty_pages = 0;
-    return dirtied_size;
-}
-
-/**********************************************************
-*********************************************************
-*************/
 /* Each of ram_save_setup, ram_save_iterate and ram_save_complete has
  * long-running RCU critical section.  When rcu-reclaims in the code
  * start to become numerous it will be necessary to reduce the
@@ -1666,12 +1625,12 @@ static int ram_load(QEMUFile *f, void *opaque, int version_id)
 }
 
 static SaveVMHandlers savevm_ram_handlers = {
-    .probe_live_setup = ram_probe_setup,
     .save_live_setup = ram_save_setup,
     .save_live_iterate = ram_save_iterate,
     .save_live_complete = ram_save_complete,
     .save_live_pending = ram_save_pending,
     .load_state = ram_load,
+    .reset_bitmap = ram_migration_bitmap_reset,
     .cancel = ram_migration_cancel,
 };
 

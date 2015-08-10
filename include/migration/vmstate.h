@@ -40,6 +40,7 @@ typedef struct SaveVMHandlers {
     SaveStateHandler *save_state;
 
     void (*cancel)(void *opaque);
+    uint64_t (*reset_bitmap)(void *opaque);
     int (*save_live_complete)(QEMUFile *f, void *opaque);
     /* This runs both outside and inside the iothread lock.  */
     bool (*is_active)(void *opaque);
@@ -53,7 +54,6 @@ typedef struct SaveVMHandlers {
 
     /* This runs outside the iothread lock!  */
     int (*save_live_setup)(QEMUFile *f, void *opaque);
-    uint64_t (*probe_live_setup)(QEMUFile *f, void *opaque);
     uint64_t (*save_live_pending)(QEMUFile *f, void *opaque, uint64_t max_size);
 
     LoadStateHandler *load_state;
