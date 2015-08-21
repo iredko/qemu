@@ -623,8 +623,6 @@ static void migration_bitmap_sync(void)
                                     - num_dirty_pages_init);
     num_dirty_pages_period += migration_dirty_pages - num_dirty_pages_init;
 
-    migration_auto_converge_check();
-
     s->dirty_sync_count = bitmap_sync_count;
 }
 
@@ -1290,6 +1288,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
         qemu_mutex_lock_iothread();
         rcu_read_lock();
         migration_bitmap_sync();
+        migration_auto_converge_check();
         rcu_read_unlock();
         qemu_mutex_unlock_iothread();
         remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
