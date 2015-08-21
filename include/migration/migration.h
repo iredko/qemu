@@ -137,7 +137,7 @@ void free_xbzrle_decoded_buf(void);
 void acct_update_position(QEMUFile *f, size_t size, bool zero);
 
 int64_t estimate_mig_time(uint64_t init_bytes, uint64_t dirtied_bytes,
-                          int64_t time_delta, double mbps);
+                          int64_t time_delta, int64_t bps);
 
 uint64_t dup_mig_bytes_transferred(void);
 uint64_t dup_mig_pages_transferred(void);

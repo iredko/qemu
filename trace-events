@@ -1399,6 +1399,7 @@ flic_reset_failed(int err) "flic: reset failed %d"
 
 # migration.c
 probe_estimate(int64_t estimate_time) "est_time %" PRId64
+probe_bandwidth(int64_t bandwidth) "bandwidth %" PRId64
 probe_timestamp(void) ""
 probe_begin(int64_t initital_bytes) "usedmem %" PRId64" bytes"
 probe_pending(uint64_t pending_size) "dirtied mem %" PRIu64
