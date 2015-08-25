@@ -168,12 +168,12 @@ void ram_control_load_hook(QEMUFile *f, uint64_t flags, void *data)
     }
 }
 
-void ram_control_sync_hook(QEMUFile *f, uint64_t flags)
+void ram_control_sync_hook(QEMUFile *f, uint64_t flags, void *data)
 {
     int ret = 0;
 
     if (f->ops->hook_ram_sync) {
-        ret = f->ops->hook_ram_sync(f, f->opaque, flags, NULL);
+        ret = f->ops->hook_ram_sync(f, f->opaque, flags, data);
         if (ret < 0) {
             qemu_file_set_error(f, ret);
         }

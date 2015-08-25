@@ -82,6 +82,7 @@ static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
                                         uint64_t flags, void *data)
 {
     int64_t end_time, time_delta;
+    uint64_t remaining_bytes = *((uint64_t*) data)
 // if we got all information we should make our estimation and stop process
     if (zero_iteration_done) {
         end_time = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
@@ -91,12 +92,12 @@ static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
         } else {
             time_delta = (end_time - start_time) / 1000000;
         }
-        dirtied_bytes = transfered_bytes - initial_bytes;
+        dirtied_bytes = remaining_bytes - initial_bytes;
         test_result(time_delta);
-        return -1;
+        return 42;
     } else {
         zero_iteration_done = true;
-        initial_bytes = transfered_bytes;
+        initial_bytes = remaining_bytes;
     }
         return 0;
 }

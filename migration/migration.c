@@ -906,6 +906,15 @@ int migrate_use_xbzrle(void)
     return s->enabled_capabilities[MIGRATION_CAPABILITY_XBZRLE];
 }
 
+bool migrate_is_test(void)
+{
+    MigrationState *s;
+
+    s = migrate_get_current();
+
+    return s->enabled_capabilities[MIGRATION_CAPABILITY_TEST_ONLY];
+}
+
 int64_t migrate_xbzrle_cache_size(void)
 {
     MigrationState *s;
@@ -977,9 +986,20 @@ static void *migration_thread(void *opaque)
         }
 
         if (qemu_file_get_error(s->file)) {
-            migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
+            if (migrate_is_test() && qemu_file_get_error(s->file) == 42) { //FIXME replace magic number with smth legit
+                migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
+                              MIGRATION_STATUS_TEST_COMPLETED);
+            } else {
+                migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
                               MIGRATION_STATUS_FAILED);
+            }
             break;
+        }
+        if (migrate_is_test()){
+            /* since no data is transfered during estimation all
+               all measurements below will be incorrect.
+               as well no need for delays. */
+            continue;
         }
         current_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
         if (current_time >= initial_time + BUFFER_DELAY) {
