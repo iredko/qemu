@@ -1207,7 +1207,7 @@ static int ram_save_iterate(QEMUFile *f, void *opaque)
     int pages_sent = 0;
 
     if (migrate_is_test()) {
-        ram_migration_bitmap_reset(f);
+        return ram_migration_bitmap_reset(f);
     }
 
     rcu_read_lock();

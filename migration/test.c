@@ -26,13 +26,7 @@ static uint64_t downtime;
 static uint64_t transfered_bytes = 0;
 static uint64_t initial_bytes = 0;
 static uint64_t dirtied_bytes;
-/*
-static int qemu_test_get_buffer(void *opaque, uint8_t *buf,
-                                int64_t pos, int size)
-{
-    return -1;
-}
-*/
+
 static int qemu_test_put_buffer(void *opaque, const uint8_t *buf,
                                 int64_t pos, int size)
 {
@@ -48,13 +42,7 @@ static int qemu_test_close(void *opaque)
     s->enabled_capabilities[MIGRATION_CAPABILITY_COMPRESS] = migration_capability_compress;
     return 0;
 }
-/*
-static int qemu_test_before_iterate(QEMUFile *f, void *opaque,
-                                        uint64_t flags, void *data)
-{
-    return 0;
-}
-*/
+
 static int64_t test_result(int64_t time_delta)
 {
     double mbps = 1000;
@@ -81,23 +69,20 @@ static int64_t test_result(int64_t time_delta)
 static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
                                         uint64_t flags, void *data)
 {
-    int64_t end_time, time_delta;
-    uint64_t remaining_bytes = *((uint64_t*) data)
+    int64_t time_delta;
+    uint64_t remaining_bytes = *((uint64_t*) data);
+    MigrationState *s = (MigrationState*) opaque;
 // if we got all information we should make our estimation and stop process
     if (zero_iteration_done) {
-        end_time = qemu_clock_get_ns(QEMU_CLOCK_REALTIME);
-        if ( end_time - start_time < downtime ){
-            usleep( (downtime - (end_time - start_time))/ 1000);
-            time_delta = downtime / 1000000;
-        } else {
-            time_delta = (end_time - start_time) / 1000000;
-        }
-        dirtied_bytes = remaining_bytes - initial_bytes;
+        dirtied_bytes = remaining_bytes;
+        time_delta = downtime / 1000000;
+        s->dirty_bytes_rate = dirtied_bytes * 1000 / time_delta;
         test_result(time_delta);
-        return 42;
+        return -42;
     } else {
         zero_iteration_done = true;
         initial_bytes = remaining_bytes;
+        usleep( downtime / 1000);
     }
         return 0;
 }
@@ -128,13 +113,6 @@ static size_t qemu_test_save_page(QEMUFile *f, void *opaque,
     return size;
 }
 
-//do not use for incoming
-/*
-static const QEMUFileOps test_read_ops = {
-    .get_buffer         = qemu_test_get_buffer,
-    .close              = qemu_test_close,
-};
-*/
 static const QEMUFileOps test_write_ops = {
     .hook_ram_sync      = qemu_test_sync_hook,
     .put_buffer         = qemu_test_put_buffer,

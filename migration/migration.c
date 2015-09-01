@@ -403,6 +403,30 @@ MigrationInfo *qmp_query_migrate(Error **errp)
         info->has_status = true;
         info->has_total_time = false;
         break;
+    case MIGRATION_STATUS_TEST_COMPLETED:
+        info->has_status = true;
+        info->has_total_time = true;
+        info->total_time = s->total_time;
+        info->has_downtime = true;
+        info->downtime = s->downtime;
+        info->has_setup_time = true;
+        info->setup_time = s->setup_time;
+
+        info->has_ram = true;
+        info->ram = g_malloc0(sizeof(*info->ram));
+        info->ram->total = ram_bytes_total();
+        info->ram->dirty_pages_rate = s->dirty_bytes_rate;
+        info->ram->mbps = s->mbps;
+        info->ram->dirty_sync_count = s->dirty_sync_count;
+
+        if (blk_mig_active()) {
+            info->has_disk = true;
+            info->disk = g_malloc0(sizeof(*info->disk));
+            info->disk->transferred = blk_mig_bytes_transferred();
+            info->disk->remaining = blk_mig_bytes_remaining();
+            info->disk->total = blk_mig_bytes_total();
+        }
+        break;
     case MIGRATION_STATUS_ACTIVE:
     case MIGRATION_STATUS_CANCELLING:
         info->has_status = true;
@@ -560,7 +584,8 @@ static void migrate_fd_cleanup(void *opaque)
 
     assert(s->state != MIGRATION_STATUS_ACTIVE);
 
-    if (s->state != MIGRATION_STATUS_COMPLETED) {
+    if ((s->state != MIGRATION_STATUS_COMPLETED)
+        ||(s->state != MIGRATION_STATUS_TEST_COMPLETED)) {
         qemu_savevm_state_cancel();
         if (s->state == MIGRATION_STATUS_CANCELLING) {
             migrate_set_state(s, MIGRATION_STATUS_CANCELLING,
@@ -986,7 +1011,7 @@ static void *migration_thread(void *opaque)
         }
 
         if (qemu_file_get_error(s->file)) {
-            if (migrate_is_test() && qemu_file_get_error(s->file) == 42) { //FIXME replace magic number with smth legit
+            if (migrate_is_test() && qemu_file_get_error(s->file) == -42) { //FIXME replace magic number with smth legit
                 migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
                               MIGRATION_STATUS_TEST_COMPLETED);
             } else {
