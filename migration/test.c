@@ -35,7 +35,35 @@ static int qemu_test_close(void *opaque)
     return 0;
 }
 
+static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
+                                        uint64_t flags, void *data)
+{
+    static uint64_t dirtied_bytes;
+    int64_t time_delta;
+    uint64_t remaining_bytes = *((uint64_t*) data);
+    MigrationState *s = (MigrationState*) opaque;
+    /* First call will be from ram_save_begin
+     * so we need to save initial size of VM memory
+     * and sleep for decent period (downtime for example). */
+    if (!zero_iteration_done) {
+        zero_iteration_done = true;
+        initial_bytes = remaining_bytes;
+        usleep( downtime / 1000);
+    } else {
+    /* Second and last call will be from ram_save_iterate.
+     * We assume that time between two synchronizations of
+     * dirty bitmap differs from downtime negligibly and
+     * make our estimation of dirty bytes rate. */
+        dirtied_bytes = remaining_bytes;
+        time_delta = downtime / 1000000;
+        s->dirty_bytes_rate = dirtied_bytes * 1000 / time_delta;
+        return -42;
+    }
+        return 0;
+}
+
 static const QEMUFileOps test_write_ops = {
+    .hook_ram_sync      = qemu_test_sync_hook,
     .put_buffer         = qemu_test_put_buffer,
     .close              = qemu_test_close,
 };

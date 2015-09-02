@@ -981,6 +981,14 @@ static void *migration_thread(void *opaque)
                               MIGRATION_STATUS_FAILED);
             break;
         }
+
+        if (migrate_is_test()){
+            /* since no data is transfered during estimation all
+               all measurements below will be incorrect.
+               as well no need for delays. */
+            continue;
+        }
+
         current_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
         if (current_time >= initial_time + BUFFER_DELAY) {
             uint64_t transferred_bytes = qemu_ftell(s->file) - initial_bytes;
