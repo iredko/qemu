@@ -105,6 +105,7 @@ typedef struct QEMUFileOps {
     QEMURamHookFunc *before_ram_iterate;
     QEMURamHookFunc *after_ram_iterate;
     QEMURamHookFunc *hook_ram_load;
+    QEMURamHookFunc *hook_ram_sync;
     QEMURamSaveFunc *save_page;
     QEMUFileShutdownFunc *shut_down;
 } QEMUFileOps;

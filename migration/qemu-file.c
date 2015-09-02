@@ -168,6 +168,18 @@ void ram_control_load_hook(QEMUFile *f, uint64_t flags, void *data)
     }
 }
 
+void ram_control_sync_hook(QEMUFile *f, uint64_t flags, void *data)
+{
+    int ret = 0;
+
+    if (f->ops->hook_ram_sync) {
+        ret = f->ops->hook_ram_sync(f, f->opaque, flags, data);
+        if (ret < 0) {
+            qemu_file_set_error(f, ret);
+        }
+    }
+}
+
 size_t ram_control_save_page(QEMUFile *f, ram_addr_t block_offset,
                              ram_addr_t offset, size_t size,
                              uint64_t *bytes_sent)
