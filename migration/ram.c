@@ -1054,6 +1054,26 @@ static void ram_migration_cancel(void *opaque)
     migration_end();
 }
 
+static uint64_t ram_migration_bitmap_reset(void *opaque)
+{
+    uint64_t dirty_bytes_remaining;
+    int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
+    /* TODO think about more locks?
+     * For now only using for prediction so the only another writer
+     * is migration_bitmap_sync_range()
+     */
+    rcu_read_lock();
+    qemu_mutex_lock(&migration_bitmap_mutex);
+    ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
+    dirty_bytes_remaining = ram_bytes_remaining();
+    bitmap_zero(migration_bitmap, ram_bitmap_pages);
+    migration_dirty_pages = 0;
+    qemu_mutex_unlock(&migration_bitmap_mutex);
+    rcu_read_unlock();
+    ram_control_sync_hook(opaque, RAM_CONTROL_HOOK, &dirty_bytes_remaining);
+    return dirty_bytes_remaining;
+}
+
 static void reset_ram_globals(void)
 {
     last_seen_block = NULL;
@@ -1169,6 +1189,10 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 
     rcu_read_unlock();
 
+    if (migrate_is_test()) {
+        ram_migration_bitmap_reset(f);
+    }
+
     ram_control_before_iterate(f, RAM_CONTROL_SETUP);
     ram_control_after_iterate(f, RAM_CONTROL_SETUP);
 
@@ -1183,6 +1207,10 @@ static int ram_save_iterate(QEMUFile *f, void *opaque)
     int i;
     int64_t t0;
     int pages_sent = 0;
+
+    if (migrate_is_test()) {
+        return ram_migration_bitmap_reset(f);
+    }
 
     rcu_read_lock();
     if (ram_list.version != last_version) {
