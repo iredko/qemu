@@ -897,6 +897,15 @@ int migrate_use_xbzrle(void)
     return s->enabled_capabilities[MIGRATION_CAPABILITY_XBZRLE];
 }
 
+bool migrate_is_test(void)
+{
+    MigrationState *s;
+
+    s = migrate_get_current();
+
+    return s->enabled_capabilities[MIGRATION_CAPABILITY_TEST_ONLY];
+}
+
 int64_t migrate_xbzrle_cache_size(void)
 {
     MigrationState *s;

@@ -529,11 +529,14 @@
 # @auto-converge: If enabled, QEMU will automatically throttle down the guest
 #          to speed up convergence of RAM migration. (since 1.6)
 #
+# @test-only: If enabled, QEMU instead of migrating will estimate migration
+#          time basing on given downtime and current dirty page rate
+#
 # Since: 1.2
 ##
 { 'enum': 'MigrationCapability',
   'data': ['xbzrle', 'rdma-pin-all', 'auto-converge', 'zero-blocks',
-           'compress', 'events'] }
+           'compress', 'events', 'test-only'] }
 
 ##
 # @MigrationCapabilityStatus
