@@ -1188,9 +1188,11 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
     }
 
     rcu_read_unlock();
+
     if (migrate_is_test()) {
         ram_migration_bitmap_reset(f);
     }
+
     ram_control_before_iterate(f, RAM_CONTROL_SETUP);
     ram_control_after_iterate(f, RAM_CONTROL_SETUP);
 
@@ -1307,7 +1309,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
 
     remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
 
-    if (remaining_size <= max_size) {
+    if ((remaining_size < max_size)||(migrate_is_test())) {
         qemu_mutex_lock_iothread();
         rcu_read_lock();
         migration_bitmap_sync();

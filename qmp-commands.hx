@@ -3432,6 +3432,7 @@ Enable/Disable migration capabilities
 - "auto-converge": throttle down guest to help convergence of migration
 - "zero-blocks": compress zero blocks during block migration
 - "events": generate events for each migration state change
+- "test-only": don't send any data, instead estimate dirty page rate
 
 Arguments:
 

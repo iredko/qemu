@@ -403,30 +403,6 @@ MigrationInfo *qmp_query_migrate(Error **errp)
         info->has_status = true;
         info->has_total_time = false;
         break;
-    case MIGRATION_STATUS_TEST_COMPLETED:
-        info->has_status = true;
-        info->has_total_time = true;
-        info->total_time = s->total_time;
-        info->has_downtime = true;
-        info->downtime = s->downtime;
-        info->has_setup_time = true;
-        info->setup_time = s->setup_time;
-
-        info->has_ram = true;
-        info->ram = g_malloc0(sizeof(*info->ram));
-        info->ram->total = ram_bytes_total();
-        info->ram->dirty_pages_rate = s->dirty_bytes_rate;
-        info->ram->mbps = s->mbps;
-        info->ram->dirty_sync_count = s->dirty_sync_count;
-
-        if (blk_mig_active()) {
-            info->has_disk = true;
-            info->disk = g_malloc0(sizeof(*info->disk));
-            info->disk->transferred = blk_mig_bytes_transferred();
-            info->disk->remaining = blk_mig_bytes_remaining();
-            info->disk->total = blk_mig_bytes_total();
-        }
-        break;
     case MIGRATION_STATUS_ACTIVE:
     case MIGRATION_STATUS_CANCELLING:
         info->has_status = true;
@@ -460,6 +436,24 @@ MigrationInfo *qmp_query_migrate(Error **errp)
         }
 
         get_xbzrle_cache_stats(info);
+        break;
+    case MIGRATION_STATUS_TEST_COMPLETED:
+        info->has_status = true;
+
+        info->has_ram = true;
+        info->ram = g_malloc0(sizeof(*info->ram));
+        info->ram->total = ram_bytes_total();
+        info->ram->dirty_pages_rate = s->dirty_bytes_rate;
+        info->ram->mbps = s->mbps;
+        info->ram->dirty_sync_count = s->dirty_sync_count;
+
+        if (blk_mig_active()) {
+            info->has_disk = true;
+            info->disk = g_malloc0(sizeof(*info->disk));
+            info->disk->transferred = blk_mig_bytes_transferred();
+            info->disk->remaining = blk_mig_bytes_remaining();
+            info->disk->total = blk_mig_bytes_total();
+        }
         break;
     case MIGRATION_STATUS_COMPLETED:
         get_xbzrle_cache_stats(info);
@@ -765,7 +759,9 @@ void qmp_migrate(const char *uri, bool has_blk, bool blk,
 
     s = migrate_init(&params);
 
-    if (strstart(uri, "tcp:", &p)) {
+    if (migrate_is_test()) {
+        test_start_migration(s, p, &local_err);
+    } else if (strstart(uri, "tcp:", &p)) {
         tcp_start_outgoing_migration(s, p, &local_err);
 #ifdef CONFIG_RDMA
     } else if (strstart(uri, "rdma:", &p)) {
@@ -779,8 +775,6 @@ void qmp_migrate(const char *uri, bool has_blk, bool blk,
     } else if (strstart(uri, "fd:", &p)) {
         fd_start_outgoing_migration(s, p, &local_err);
 #endif
-    } else if (strstart(uri, "test:", &p)) {
-        test_start_migration(s, p, &local_err);
     } else {
         error_setg(errp, QERR_INVALID_PARAMETER_VALUE, "uri",
                    "a valid migration protocol");
@@ -976,7 +970,8 @@ static void *migration_thread(void *opaque)
         if (!qemu_file_rate_limit(s->file)) {
             pending_size = qemu_savevm_state_pending(s->file, max_size);
             trace_migrate_pending(pending_size, max_size);
-            if (pending_size >= max_size) {
+            if ((pending_size && pending_size >= max_size)
+                ||(migrate_is_test())) {
                 qemu_savevm_state_iterate(s->file);
             } else {
                 int ret;
@@ -1020,12 +1015,14 @@ static void *migration_thread(void *opaque)
             }
             break;
         }
+
         if (migrate_is_test()){
             /* since no data is transfered during estimation all
                all measurements below will be incorrect.
                as well no need for delays. */
             continue;
         }
+
         current_time = qemu_clock_get_ms(QEMU_CLOCK_REALTIME);
         if (current_time >= initial_time + BUFFER_DELAY) {
             uint64_t transferred_bytes = qemu_ftell(s->file) - initial_bytes;
