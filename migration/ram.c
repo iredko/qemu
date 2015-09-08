@@ -1054,7 +1054,7 @@ static void ram_migration_cancel(void *opaque)
     migration_end();
 }
 
-static uint64_t ram_migration_bitmap_reset(void *opaque)
+static uint64_t ram_migration_bitmap_reset(void)
 {
     uint64_t dirty_bytes_remaining;
     int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
@@ -1070,7 +1070,6 @@ static uint64_t ram_migration_bitmap_reset(void *opaque)
     migration_dirty_pages = 0;
     qemu_mutex_unlock(&migration_bitmap_mutex);
     rcu_read_unlock();
-    ram_control_sync_hook(opaque, RAM_CONTROL_HOOK, &dirty_bytes_remaining);
     return dirty_bytes_remaining;
 }
 
@@ -1120,6 +1119,7 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 {
     RAMBlock *block;
     int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
+    uint64_t dirty_bytes;
 
     mig_throttle_on = false;
     dirty_rate_high_cnt = 0;
@@ -1173,6 +1173,7 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
      * gaps due to alignment or unplugs.
      */
     migration_dirty_pages = ram_bytes_total() >> TARGET_PAGE_BITS;
+    dirty_bytes = ram_bytes_total();
 
     memory_global_dirty_log_start();
     migration_bitmap_sync();
@@ -1189,9 +1190,7 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 
     rcu_read_unlock();
 
-    if (migrate_is_test()) {
-        ram_migration_bitmap_reset(f);
-    }
+    ram_control_sync_hook(opaque, RAM_CONTROL_SETUP, &dirty_bytes);
 
     ram_control_before_iterate(f, RAM_CONTROL_SETUP);
     ram_control_after_iterate(f, RAM_CONTROL_SETUP);
@@ -1209,7 +1208,7 @@ static int ram_save_iterate(QEMUFile *f, void *opaque)
     int pages_sent = 0;
 
     if (migrate_is_test()) {
-        return ram_migration_bitmap_reset(f);
+        return ram_migration_bitmap_reset();
     }
 
     rcu_read_lock();
@@ -1316,6 +1315,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
         rcu_read_unlock();
         qemu_mutex_unlock_iothread();
         remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
+        ram_control_sync_hook(opaque, RAM_CONTROL_HOOK, &remaining_size);
     }
     return remaining_size;
 }
