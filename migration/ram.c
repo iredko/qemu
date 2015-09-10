@@ -1190,7 +1190,7 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 
     rcu_read_unlock();
 
-    ram_control_sync_hook(opaque, RAM_CONTROL_SETUP, &dirty_bytes);
+    ram_control_sync_hook(f, RAM_CONTROL_SETUP, &dirty_bytes);
 
     ram_control_before_iterate(f, RAM_CONTROL_SETUP);
     ram_control_after_iterate(f, RAM_CONTROL_SETUP);
@@ -1315,7 +1315,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
         rcu_read_unlock();
         qemu_mutex_unlock_iothread();
         remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
-        ram_control_sync_hook(opaque, RAM_CONTROL_HOOK, &remaining_size);
+        ram_control_sync_hook(f, RAM_CONTROL_HOOK, &remaining_size);
     }
     return remaining_size;
 }
