@@ -17,10 +17,9 @@ typedef struct QEMUFileTest {
     QEMUFile *file;
 } QEMUFileTest;
 
-//stubs
-static bool zero_iteration_done = false;
-static uint64_t transfered_bytes = 0;
-static uint64_t initial_bytes = 0;
+static bool zero_iteration_done;
+static uint64_t transfered_bytes;
+static uint64_t initial_bytes;
 
 static int qemu_test_put_buffer(void *opaque, const uint8_t *buf,
                                 int64_t pos, int size)
@@ -39,10 +38,10 @@ static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
                                         uint64_t flags, void *data)
 {
     static uint64_t dirtied_bytes;
-    uint64_t downtime = 0;
+    static uint64_t downtime;
     int64_t time_delta;
-    uint64_t remaining_bytes = *((uint64_t*) data);
-    MigrationState *s = (MigrationState*) opaque;
+    uint64_t remaining_bytes = *((uint64_t *) data);
+    MigrationState *s = (MigrationState *) opaque;
     /* First call will be from ram_save_begin
      * so we need to save initial size of VM memory
      * and sleep for decent period (downtime for example). */
@@ -50,7 +49,7 @@ static int qemu_test_sync_hook(QEMUFile *f, void *opaque,
         downtime = migrate_max_downtime();
         zero_iteration_done = true;
         initial_bytes = remaining_bytes;
-        usleep( downtime / 1000);
+        usleep(downtime / 1000);
     } else {
     /* Second and last call will be from ram_save_iterate.
      * We assume that time between two synchronizations of

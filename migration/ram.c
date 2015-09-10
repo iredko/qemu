@@ -1056,7 +1056,7 @@ static void ram_migration_cancel(void *opaque)
 
 static uint64_t ram_migration_bitmap_reset(void)
 {
-    uint64_t dirty_bytes_remaining;
+    uint64_t dirty_pages_remaining;
     int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
     /* TODO think about more locks?
      * For now only using for prediction so the only another writer
@@ -1065,12 +1065,12 @@ static uint64_t ram_migration_bitmap_reset(void)
     rcu_read_lock();
     qemu_mutex_lock(&migration_bitmap_mutex);
     ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
-    dirty_bytes_remaining = ram_bytes_remaining();
+    dirty_pages_remaining = migration_dirty_pages;
     bitmap_zero(migration_bitmap, ram_bitmap_pages);
     migration_dirty_pages = 0;
     qemu_mutex_unlock(&migration_bitmap_mutex);
     rcu_read_unlock();
-    return dirty_bytes_remaining;
+    return dirty_pages_remaining;
 }
 
 static void reset_ram_globals(void)
@@ -1119,7 +1119,6 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 {
     RAMBlock *block;
     int64_t ram_bitmap_pages; /* Size of bitmap in pages, including gaps */
-    uint64_t dirty_bytes;
 
     mig_throttle_on = false;
     dirty_rate_high_cnt = 0;
@@ -1173,7 +1172,6 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
      * gaps due to alignment or unplugs.
      */
     migration_dirty_pages = ram_bytes_total() >> TARGET_PAGE_BITS;
-    dirty_bytes = ram_bytes_total();
 
     memory_global_dirty_log_start();
     migration_bitmap_sync();
@@ -1190,8 +1188,6 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 
     rcu_read_unlock();
 
-    ram_control_sync_hook(f, RAM_CONTROL_SETUP, &dirty_bytes);
-
     ram_control_before_iterate(f, RAM_CONTROL_SETUP);
     ram_control_after_iterate(f, RAM_CONTROL_SETUP);
 
@@ -1199,7 +1195,11 @@ static int ram_save_setup(QEMUFile *f, void *opaque)
 
     return 0;
 }
-
+/* we are returning number of transfered pages, but we use
+ * int for return value and uint64_t for migration_dirty_pages
+ * I understand that each iteration lasts 50ms and there is no
+ * transport wich be able to transfer more than 8GB per 50 ms
+ * but...*/
 static int ram_save_iterate(QEMUFile *f, void *opaque)
 {
     int ret;
@@ -1308,7 +1308,7 @@ static uint64_t ram_save_pending(QEMUFile *f, void *opaque, uint64_t max_size)
 
     remaining_size = ram_save_remaining() * TARGET_PAGE_SIZE;
 
-    if ((remaining_size < max_size)||(migrate_is_test())) {
+    if ((remaining_size < max_size) || (migrate_is_test())) {
         qemu_mutex_lock_iothread();
         rcu_read_lock();
         migration_bitmap_sync();

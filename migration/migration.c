@@ -578,8 +578,7 @@ static void migrate_fd_cleanup(void *opaque)
 
     assert(s->state != MIGRATION_STATUS_ACTIVE);
 
-    if ((s->state != MIGRATION_STATUS_COMPLETED)
-        ||(s->state != MIGRATION_STATUS_TEST_COMPLETED)) {
+    if (s->state != MIGRATION_STATUS_COMPLETED) {
         qemu_savevm_state_cancel();
         if (s->state == MIGRATION_STATUS_CANCELLING) {
             migrate_set_state(s, MIGRATION_STATUS_CANCELLING,
@@ -971,7 +970,7 @@ static void *migration_thread(void *opaque)
             pending_size = qemu_savevm_state_pending(s->file, max_size);
             trace_migrate_pending(pending_size, max_size);
             if ((pending_size && pending_size >= max_size)
-                ||(migrate_is_test())) {
+                || (migrate_is_test())) {
                 qemu_savevm_state_iterate(s->file);
             } else {
                 int ret;
@@ -1004,9 +1003,9 @@ static void *migration_thread(void *opaque)
                 }
             }
         }
-
         if (qemu_file_get_error(s->file)) {
-            if (migrate_is_test() && qemu_file_get_error(s->file) == -42) { //FIXME replace magic number with smth legit
+            /*FIXME replace magic number with smth legit*/
+            if (migrate_is_test() && qemu_file_get_error(s->file) == -42) {
                 migrate_set_state(s, MIGRATION_STATUS_ACTIVE,
                               MIGRATION_STATUS_TEST_COMPLETED);
             } else {
@@ -1016,7 +1015,7 @@ static void *migration_thread(void *opaque)
             break;
         }
 
-        if (migrate_is_test()){
+        if (migrate_is_test()) {
             /* since no data is transfered during estimation all
                all measurements below will be incorrect.
                as well no need for delays. */
