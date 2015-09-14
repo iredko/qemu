@@ -1062,14 +1062,14 @@ static uint64_t ram_migration_bitmap_reset(void)
      * For now only using for prediction so the only another writer
      * is migration_bitmap_sync_range()
      */
-    rcu_read_lock();
     qemu_mutex_lock(&migration_bitmap_mutex);
+    rcu_read_lock();
     ram_bitmap_pages = last_ram_offset() >> TARGET_PAGE_BITS;
     dirty_pages_remaining = migration_dirty_pages;
     bitmap_zero(migration_bitmap, ram_bitmap_pages);
     migration_dirty_pages = 0;
-    qemu_mutex_unlock(&migration_bitmap_mutex);
     rcu_read_unlock();
+    qemu_mutex_unlock(&migration_bitmap_mutex);
     return dirty_pages_remaining;
 }
 
